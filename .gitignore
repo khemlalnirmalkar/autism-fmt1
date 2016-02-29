@@ -63,3 +63,4 @@ target/
 
 # mapping file
 combined-map.tsv
+tax-results/
