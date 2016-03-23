@@ -8,7 +8,7 @@ from skbio.stats.distance import MissingIDError
 
 palette = {'Responder': '#68228B', 'Non-responder': '#807dba',
            'neurotypical': '#228B22', 'donor': '#d95f02',
-            'Rectal': '#68228B', 'Oral': '#807dba'}
+           'Rectal': '#68228B', 'Oral': '#807dba'}
 
 def get_donor_sids(sample_md):
     donor_sids = sample_md[sample_md['SampleType'] == 'donor-stool']['SubjectID']
@@ -145,8 +145,11 @@ def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=a
     stats.sort_index()
     for i, w in enumerate(stats.index):
         t, p = stats['t'][w], stats['p-value'][w]
-        if one_tailed and t < 0.0:
-            p = p/2.
+        if one_tailed:
+            if t < 0.0:
+                p = p/2.
+            else:
+                p = 1.0
         sig_text = get_sig_text(p, alphas)
         ax.text(i, 1.02*ymax, sig_text, ha='center',va='center')
     return ax
