@@ -64,3 +64,5 @@ target/
 # mapping file
 combined-map.tsv
 tax-results/
+taxonmy-change.csv
+taxonomy-engraftment.csv

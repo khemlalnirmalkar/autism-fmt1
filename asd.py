@@ -3,6 +3,7 @@ import scipy.stats
 import bisect
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from skbio.stats.distance import MissingIDError
 
@@ -39,6 +40,11 @@ def control_metric(sample_md, sample_type, metric):
     group_sids = filter_sample_md(sample_md,
                                   [('Group', 'neurotypical'), ('time_point', "1"), ('SampleType', sample_type)]).index
     return group_metric(sample_md, group_sids, metric)
+
+def inter_neurotypical_distances(sample_md, dm, sample_type):
+    group_sids = filter_sample_md(sample_md,
+                                  [('Group', 'neurotypical'), ('time_point', "1"), ('SampleType', sample_type)]).index
+    return dm.filter(group_sids, strict=False)
 
 
 def group_metric(sample_md, group_sids, metric):
@@ -112,7 +118,7 @@ def filter_sample_md(sample_md, includes):
         result = result[result[column] == value]
     return result
 
-def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False):
+def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False, dm=None):
     df['week'] = pd.to_numeric(df['week'], errors='coerce')
     df[metric] = pd.to_numeric(df[metric], errors='coerce')
     asd_data = filter_sample_md(df, [('SampleType', sample_type), ('Group', 'autism')])
@@ -129,8 +135,37 @@ def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False,
     if not hide_donor_baseline:
         ax.plot([x0, x1], [donor_y, donor_y],
             color=palette['donor'], linestyle='--', label='donor (median)')
+    if dm is not None:
+        inter_nt_dm = inter_neurotypical_distances(df, dm, sample_type=sample_type)
+        median_inter_nt = np.median(inter_nt_dm.condensed_form())
+        ax.plot([x0, x1], [median_inter_nt, median_inter_nt],
+            color=palette['neurotypical'], linestyle='-.', label='between neurotypical distance (median)')
     ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     return ax
+
+def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False):
+    df['week'] = pd.to_numeric(df['week'], errors='coerce')
+    df[metric] = pd.to_numeric(df[metric], errors='coerce')
+    asd_data = filter_sample_md(df, [('SampleType', sample_type), ('Group', 'autism')])
+    order = sorted(asd_data['SubjectID'].unique())
+
+    grid = sns.FacetGrid(asd_data, col="SubjectID", hue=hue, col_wrap=5, size=1.5, palette=palette,
+                         col_order=order)
+
+    control_y = np.median(control_metric(df, sample_type, metric=metric))
+    donor_y = np.median(donor_metric(df, metric=metric))
+
+    grid.map(plt.plot, "week", metric, marker="o", ms=4)
+
+    if not hide_control_baseline:
+        grid.map(plt.axhline, y=control_y, ls="--", c=palette['neurotypical'])
+    if not hide_donor_baseline:
+        grid.map(plt.axhline, y=donor_y, ls="--", c=palette['donor'])
+
+    grid.set(xticks=[0, 3, 10, 18], xlim=(-0.5, 18.5))
+    grid.set_axis_labels("", "")
+    grid.fig.tight_layout(w_pad=1)
+    return grid
 
 alphas = [(0.001, '***'), (0.01, '**'), (0.05, '*')]
 
@@ -144,9 +179,9 @@ def get_sig_text(p, alphas, null_text=""):
     return alphas[sorted_location][1]
 
 def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=alphas, one_tailed=False,
-                              hide_donor_baseline=False, hide_control_baseline=False):
+                              hide_donor_baseline=False, hide_control_baseline=False, dm=None):
     ax = plot_week_data(sample_md, sample_type, metric, hue, hide_donor_baseline=hide_donor_baseline,
-                        hide_control_baseline=hide_control_baseline)
+                        hide_control_baseline=hide_control_baseline, dm=dm)
     stats = tabulate_week_to_week0_paired_stats(sample_md, sample_type, metric)
     ymax = ax.get_ylim()[1]
     stats.sort_index()
