@@ -118,38 +118,46 @@ def filter_sample_md(sample_md, includes):
         result = result[result[column] == value]
     return result
 
-def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False, dm=None):
+def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False, dm=None, show_legend=True, label_axes=True):
     df['week'] = pd.to_numeric(df['week'], errors='coerce')
     df[metric] = pd.to_numeric(df[metric], errors='coerce')
     asd_data = filter_sample_md(df, [('SampleType', sample_type), ('Group', 'autism')])
     asd_data = asd_data.sort_values(by='week')
-    ax = sns.boxplot(data=asd_data, x='week', y=metric, color='white')
-    ax = sns.swarmplot(data=asd_data, x='week', y=metric, hue=hue, palette=palette)
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax = sns.boxplot(data=asd_data, x='week', y=metric, color='white', ax=ax)
+    ax = sns.swarmplot(data=asd_data, x='week', y=metric, hue=hue, palette=palette, ax=ax)
     control_y = np.median(control_metric(df, sample_type, metric=metric))
     donor_y = np.median(donor_metric(df, metric=metric))
     x0 = np.min(df['week']) - 1
     x1 = np.max(df['week']) + 1
     if not hide_control_baseline:
-        ax.plot([x0, x1], [control_y, control_y],
+        ax.axhline(control_y,
                 color=palette['neurotypical'], linestyle='--', label='neurotypical (median)')
     if not hide_donor_baseline:
-        ax.plot([x0, x1], [donor_y, donor_y],
+        ax.axhline(donor_y,
             color=palette['donor'], linestyle='--', label='donor (median)')
     if dm is not None:
         inter_nt_dm = inter_neurotypical_distances(df, dm, sample_type=sample_type)
         median_inter_nt = np.median(inter_nt_dm.condensed_form())
-        ax.plot([x0, x1], [median_inter_nt, median_inter_nt],
+        ax.axhline(median_inter_nt,
             color=palette['neurotypical'], linestyle='-.', label='between neurotypical distance (median)')
-    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    return ax
+    if show_legend:
+        ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    else:
+        ax.legend().remove()
+    if not label_axes:
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+    return fig
 
-def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False):
+def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False, dm=None, save=True):
     df['week'] = pd.to_numeric(df['week'], errors='coerce')
     df[metric] = pd.to_numeric(df[metric], errors='coerce')
     asd_data = filter_sample_md(df, [('SampleType', sample_type), ('Group', 'autism')])
     order = sorted(asd_data['SubjectID'].unique())
 
-    grid = sns.FacetGrid(asd_data, col="SubjectID", hue=hue, col_wrap=5, size=1.5, palette=palette,
+    grid = sns.FacetGrid(asd_data, col="SubjectID", hue=hue, col_wrap=6, size=1.5, palette=palette,
                          col_order=order)
 
     control_y = np.median(control_metric(df, sample_type, metric=metric))
@@ -161,10 +169,18 @@ def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=
         grid.map(plt.axhline, y=control_y, ls="--", c=palette['neurotypical'])
     if not hide_donor_baseline:
         grid.map(plt.axhline, y=donor_y, ls="--", c=palette['donor'])
+    if dm is not None:
+        inter_nt_dm = inter_neurotypical_distances(df, dm, sample_type=sample_type)
+        median_inter_nt = np.median(inter_nt_dm.condensed_form())
+        grid.map(plt.axhline, y=median_inter_nt,
+            color=palette['neurotypical'], linestyle='-.', label='between neurotypical distance (median)')
 
     grid.set(xticks=[0, 3, 10, 18], xlim=(-0.5, 18.5))
     grid.set_axis_labels("", "")
     grid.fig.tight_layout(w_pad=1)
+    if save:
+        filename = '%s-%s-%s-detail.pdf' % (sample_type, metric.replace(' ', '-'), hue)
+        grid.savefig('engraftment-plots/%s' % filename)
     return grid
 
 alphas = [(0.001, '***'), (0.01, '**'), (0.05, '*')]
@@ -179,11 +195,11 @@ def get_sig_text(p, alphas, null_text=""):
     return alphas[sorted_location][1]
 
 def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=alphas, one_tailed=False,
-                              hide_donor_baseline=False, hide_control_baseline=False, dm=None):
-    ax = plot_week_data(sample_md, sample_type, metric, hue, hide_donor_baseline=hide_donor_baseline,
-                        hide_control_baseline=hide_control_baseline, dm=dm)
+                              hide_donor_baseline=False, hide_control_baseline=False, dm=None, save=True):
+    fig = plot_week_data(sample_md, sample_type, metric, hue, hide_donor_baseline=hide_donor_baseline,
+                         hide_control_baseline=hide_control_baseline, dm=dm, show_legend=not save, label_axes=not save)
     stats = tabulate_week_to_week0_paired_stats(sample_md, sample_type, metric)
-    ymax = ax.get_ylim()[1]
+    ymax = fig.axes[0].get_ylim()[1]
     stats.sort_index()
     for i, w in enumerate(stats.index):
         t, p = stats['t'][w], stats['p-value'][w]
@@ -193,8 +209,11 @@ def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=a
             else:
                 p = 1.0
         sig_text = get_sig_text(p, alphas)
-        ax.text(i, 1.02*ymax, sig_text, ha='center',va='center')
-    return ax
+        fig.axes[0].text(i, 1.02*ymax, sig_text, ha='center',va='center')
+    if save:
+        filename = '%s-%s-%s.pdf' % (sample_type, metric.replace(' ', '-'), hue)
+        fig.savefig('engraftment-plots/%s' % filename)
+    return fig
 
 # Paired t-test: change in distance to donor from time zero is different than zero
 # (positive t means more different than donor, negative t means more similar to donor)
