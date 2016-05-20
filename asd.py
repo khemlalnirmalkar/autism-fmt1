@@ -7,9 +7,17 @@ import matplotlib.pyplot as plt
 
 from skbio.stats.distance import MissingIDError
 
+import matplotlib
+font = {'family' : 'Arial',
+        'weight' : 'normal',
+        'size'   : 8}
+matplotlib.rc('font', **font)
+
 palette = {'Responder': '#68228B', 'Non-responder': '#807dba',
            'neurotypical': '#228B22', 'donor': '#d95f02',
            'Rectal': '#68228B', 'Oral': '#807dba'}
+
+sns.set_style("whitegrid")
 
 def get_donor_sids(sample_md):
     donor_sids = sample_md[sample_md['SampleType'] == 'donor-stool']['SubjectID']
@@ -31,9 +39,9 @@ def control_distance_to_donors(sample_md, dm, sample_type):
             results.append(d)
     return results
 
-def donor_metric(sample_md, metric):
+def donor_metric(sample_md, metric, group='donor-initial'):
     group_sids = filter_sample_md(sample_md,
-                                  [('Group', 'donor-initial'), ('SampleType', 'donor-stool')]).index
+                                  [('Group', group), ('SampleType', 'donor-stool')]).index
     return group_metric(sample_md, group_sids, metric)
 
 def control_metric(sample_md, sample_type, metric):
@@ -128,15 +136,18 @@ def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False,
     ax = sns.boxplot(data=asd_data, x='week', y=metric, color='white', ax=ax)
     ax = sns.swarmplot(data=asd_data, x='week', y=metric, hue=hue, palette=palette, ax=ax)
     control_y = np.median(control_metric(df, sample_type, metric=metric))
-    donor_y = np.median(donor_metric(df, metric=metric))
     x0 = np.min(df['week']) - 1
     x1 = np.max(df['week']) + 1
     if not hide_control_baseline:
         ax.axhline(control_y,
                 color=palette['neurotypical'], linestyle='--', label='neurotypical (median)')
     if not hide_donor_baseline:
-        ax.axhline(donor_y,
+        donor_initial_y = np.median(donor_metric(df, metric=metric, group='donor-initial'))
+        donor_maintenance_y = np.median(donor_metric(df, metric=metric, group='donor-maintenance'))
+        ax.axhline(donor_initial_y,
             color=palette['donor'], linestyle='--', label='donor (median)')
+        ax.axhline(donor_maintenance_y,
+            color=palette['donor'], linestyle=':', label='donor (median)')
     if dm is not None:
         inter_nt_dm = inter_neurotypical_distances(df, dm, sample_type=sample_type)
         median_inter_nt = np.median(inter_nt_dm.condensed_form())
@@ -161,14 +172,16 @@ def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=
                          col_order=order)
 
     control_y = np.median(control_metric(df, sample_type, metric=metric))
-    donor_y = np.median(donor_metric(df, metric=metric))
 
     grid.map(plt.plot, "week", metric, marker="o", ms=4)
 
     if not hide_control_baseline:
         grid.map(plt.axhline, y=control_y, ls="--", c=palette['neurotypical'])
     if not hide_donor_baseline:
-        grid.map(plt.axhline, y=donor_y, ls="--", c=palette['donor'])
+        donor_initial_y = np.median(donor_metric(df, metric=metric, group='donor-initial'))
+        donor_maintenance_y = np.median(donor_metric(df, metric=metric, group='donor-maintenance'))
+        grid.map(plt.axhline, y=donor_initial_y, ls="--", c=palette['donor'])
+        grid.map(plt.axhline, y=donor_maintenance_y, ls=":", c=palette['donor'])
     if dm is not None:
         inter_nt_dm = inter_neurotypical_distances(df, dm, sample_type=sample_type)
         median_inter_nt = np.median(inter_nt_dm.condensed_form())
@@ -212,7 +225,7 @@ def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=a
         fig.axes[0].text(i, 1.02*ymax, sig_text, ha='center',va='center')
     if save:
         filename = '%s-%s-%s.pdf' % (sample_type, metric.replace(' ', '-'), hue)
-        fig.savefig('engraftment-plots/%s' % filename)
+        fig.savefig('engraftment-plots/%s' % filename, dpi = (300))
     return fig
 
 # Paired t-test: change in distance to donor from time zero is different than zero
