@@ -207,7 +207,7 @@ def get_sig_text(p, alphas, null_text=""):
     sorted_location = bisect.bisect([e[0] for e in alphas], p)
     return alphas[sorted_location][1]
 
-def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=alphas, one_tailed=False,
+def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=alphas,
                               hide_donor_baseline=False, hide_control_baseline=False, dm=None, save=True):
     fig = plot_week_data(sample_md, sample_type, metric, hue, hide_donor_baseline=hide_donor_baseline,
                          hide_control_baseline=hide_control_baseline, dm=dm, show_legend=not save, label_axes=not save)
@@ -216,11 +216,6 @@ def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=a
     stats.sort_index()
     for i, w in enumerate(stats.index):
         t, p = stats['t'][w], stats['p-value'][w]
-        if one_tailed:
-            if t < 0.0:
-                p = p/2.
-            else:
-                p = 1.0
         sig_text = get_sig_text(p, alphas)
         fig.axes[0].text(i, 1.02*ymax, sig_text, ha='center',va='center')
     if save:
@@ -230,7 +225,8 @@ def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=a
 
 # Paired t-test: change in distance to donor from time zero is different than zero
 # (positive t means more different than donor, negative t means more similar to donor)
-def tabulate_week_to_week0_paired_stats(df, sample_type, metric):
+def tabulate_week_to_week0_paired_stats(df, sample_type, metric, test_fn=scipy.stats.wilcoxon):
+    # alternative test_fn: partial(scipy.stats.ttest_1samp, popmean=0)
     asd_data = filter_sample_md(df, [('SampleType', sample_type), ('Group', 'autism')])
     results = []
     asd_data['week'] = pd.to_numeric(asd_data['week'], errors='coerce')
@@ -239,14 +235,15 @@ def tabulate_week_to_week0_paired_stats(df, sample_type, metric):
     for i in weeks:
         g = asd_data[np.logical_or(asd_data['week'] == 0, asd_data['week'] == i)].groupby('SubjectID')
         paired_diffs = g.diff()[metric].dropna()
-        t, p = scipy.stats.ttest_1samp(paired_diffs, popmean=0)
+        t, p = test_fn(paired_diffs)
         results.append((len(paired_diffs), np.median(paired_diffs), t, p))
     return pd.DataFrame(results, index=pd.Index(weeks, name='week'),
                         columns=['n', metric, 't', 'p-value'])
 
 # two sample t-test: does ASD data at each week differ significantly from
 # the control group?
-def tabulate_week_to_control_stats(df, sample_type, metric):
+def tabulate_week_to_control_stats(df, sample_type, metric, test_fn=scipy.stats.mannwhitneyu):
+    # alternative test_fn: partial(scipy.stats.ttest_ind, equal_var=False)
     control_week0 = control_metric(df, sample_type, metric=metric)
     asd_data = filter_sample_md(df, [('SampleType', sample_type), ('Group', 'autism')])
     results = []
@@ -255,7 +252,7 @@ def tabulate_week_to_control_stats(df, sample_type, metric):
     weeks = asd_data['week'].unique()
     for i in weeks:
         weeki = asd_data[metric][asd_data['week'] == i].dropna()
-        t, p = scipy.stats.ttest_ind(weeki, control_week0, equal_var=False)
+        t, p = test_fn(weeki, control_week0)
         results.append((len(weeki), np.median(weeki), t, p))
     return pd.DataFrame(results, index=pd.Index(weeks, name='week'),
                         columns=['n', metric, 't', 'p-value'])
