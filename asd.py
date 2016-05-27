@@ -39,9 +39,9 @@ def control_distance_to_donors(sample_md, dm, sample_type):
             results.append(d)
     return results
 
-def donor_metric(sample_md, metric, group='donor-initial'):
+def donor_metric(sample_md, metric, group='donor-initial', sample_type='stool'):
     group_sids = filter_sample_md(sample_md,
-                                  [('Group', group), ('SampleType', 'donor-stool')]).index
+                                  [('Group', group), ('SampleType', 'donor-%s' % sample_type)]).index
     return group_metric(sample_md, group_sids, metric)
 
 def control_metric(sample_md, sample_type, metric):
@@ -135,24 +135,29 @@ def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False,
     ax = fig.add_subplot(1,1,1)
     ax = sns.boxplot(data=asd_data, x='week', y=metric, color='white', ax=ax)
     ax = sns.swarmplot(data=asd_data, x='week', y=metric, hue=hue, palette=palette, ax=ax)
-    control_y = np.median(control_metric(df, sample_type, metric=metric))
+
     x0 = np.min(df['week']) - 1
     x1 = np.max(df['week']) + 1
     if not hide_control_baseline:
+        control = control_metric(df, sample_type, metric=metric)
+        control_y = np.median(control)
         ax.axhline(control_y,
-                color=palette['neurotypical'], linestyle='--', label='neurotypical (median)')
+                color=palette['neurotypical'], linestyle='--', label='neurotypical (median; n=%d)' % len(control))
     if not hide_donor_baseline:
-        donor_initial_y = np.median(donor_metric(df, metric=metric, group='donor-initial'))
-        donor_maintenance_y = np.median(donor_metric(df, metric=metric, group='donor-maintenance'))
+        donor_initial = donor_metric(df, metric=metric, group='donor-initial', sample_type=sample_type)
+        donor_initial_y = np.median(donor_initial)
+        donor_maintenance = donor_metric(df, metric=metric, group='donor-maintenance', sample_type=sample_type)
+        donor_maintenance_y = np.median(donor_maintenance)
         ax.axhline(donor_initial_y,
-            color=palette['donor'], linestyle='--', label='donor (median)')
+            color=palette['donor'], linestyle='--', label='donor (median; n=%d)' % len(donor_initial))
         ax.axhline(donor_maintenance_y,
-            color=palette['donor'], linestyle=':', label='donor (median)')
+            color=palette['donor'], linestyle=':', label='donor (median; n=%d)' % len(donor_maintenance))
     if dm is not None:
         inter_nt_dm = inter_neurotypical_distances(df, dm, sample_type=sample_type)
-        median_inter_nt = np.median(inter_nt_dm.condensed_form())
+        inter_nt = inter_nt_dm.condensed_form()
+        median_inter_nt = np.median(inter_nt)
         ax.axhline(median_inter_nt,
-            color=palette['neurotypical'], linestyle='-.', label='between neurotypical distance (median)')
+            color=palette['neurotypical'], linestyle='-.', label='between neurotypical distance (median; n=%d)' % len(inter_nt))
     if show_legend:
         ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     else:
@@ -178,8 +183,8 @@ def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=
     if not hide_control_baseline:
         grid.map(plt.axhline, y=control_y, ls="--", c=palette['neurotypical'])
     if not hide_donor_baseline:
-        donor_initial_y = np.median(donor_metric(df, metric=metric, group='donor-initial'))
-        donor_maintenance_y = np.median(donor_metric(df, metric=metric, group='donor-maintenance'))
+        donor_initial_y = np.median(donor_metric(df, metric=metric, group='donor-initial', sample_type=sample_type))
+        donor_maintenance_y = np.median(donor_metric(df, metric=metric, group='donor-maintenance', sample_type=sample_type))
         grid.map(plt.axhline, y=donor_initial_y, ls="--", c=palette['donor'])
         grid.map(plt.axhline, y=donor_maintenance_y, ls=":", c=palette['donor'])
     if dm is not None:
