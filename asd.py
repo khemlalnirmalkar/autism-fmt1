@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from skbio.stats.distance import MissingIDError
+from statsmodels.sandbox.stats.multicomp import fdrcorrection0
 
 import matplotlib
 font = {'family' : 'Arial',
@@ -170,6 +171,7 @@ def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False,
 def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False, dm=None, save=True):
     df['week'] = pd.to_numeric(df['week'], errors='coerce')
     df[metric] = pd.to_numeric(df[metric], errors='coerce')
+    df = df.sort_values(by='week')
     asd_data = filter_sample_md(df, [('SampleType', sample_type), ('Group', 'autism')])
     order = sorted(asd_data['SubjectID'].unique())
 
@@ -220,8 +222,8 @@ def plot_week_data_with_stats(sample_md, sample_type, metric, hue=None, alphas=a
     ymax = fig.axes[0].get_ylim()[1]
     stats.sort_index()
     for i, w in enumerate(stats.index):
-        t, p = stats['t'][w], stats['p-value'][w]
-        sig_text = get_sig_text(p, alphas)
+        t, q = stats['test-statistic'][w], stats['q-value'][w]
+        sig_text = get_sig_text(q, alphas)
         fig.axes[0].text(i, 1.02*ymax, sig_text, ha='center',va='center')
     if save:
         filename = '%s-%s-%s.pdf' % (sample_type, metric.replace(' ', '-'), hue)
@@ -242,8 +244,20 @@ def tabulate_week_to_week0_paired_stats(df, sample_type, metric, test_fn=scipy.s
         paired_diffs = g.diff()[metric].dropna()
         t, p = test_fn(paired_diffs)
         results.append((len(paired_diffs), np.median(paired_diffs), t, p))
-    return pd.DataFrame(results, index=pd.Index(weeks, name='week'),
-                        columns=['n', metric, 't', 'p-value'])
+    result = pd.DataFrame(results, index=pd.Index(weeks, name='week'),
+                          columns=['n', metric, 'test-statistic', 'p-value'])
+
+    # Masking motiviated by the issue presented here (which is also where the
+    # masking solution is derived from):
+    # https://github.com/statsmodels/statsmodels/issues/2899
+    pvals = result['p-value'].values
+    mask = np.isfinite(pvals)
+    qvals = np.empty(len(pvals))
+    qvals.fill(np.nan)
+    qvals[mask] = fdrcorrection0(pvals[mask])[1]
+
+    result['q-value'] = qvals
+    return result
 
 # two sample t-test: does ASD data at each week differ significantly from
 # the control group?
@@ -259,5 +273,7 @@ def tabulate_week_to_control_stats(df, sample_type, metric, test_fn=scipy.stats.
         weeki = asd_data[metric][asd_data['week'] == i].dropna()
         t, p = test_fn(weeki, control_week0)
         results.append((len(weeki), np.median(weeki), t, p))
-    return pd.DataFrame(results, index=pd.Index(weeks, name='week'),
-                        columns=['n', metric, 't', 'p-value'])
+    result = pd.DataFrame(results, index=pd.Index(weeks, name='week'),
+                          columns=['n', metric, 'test-statistic', 'p-value'])
+    result['q-value'] = fdrcorrection0(result['p-value'])[1]
+    return result
