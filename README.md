@@ -4,7 +4,7 @@ This repository contains 16S and virome analysis software and data for:
 
 **Microbiota transfer alters gut ecosystem and improves gastrointestinal and autism symptoms.**
 Kang, D, Adams, JB, Gregory, A, Borody, T, Chittick, L, Fasano, A, Khoruts, A, Geis, E, Maldonado, J, McDonough-Means, S, Pollard, EL, Roux, S, Sadowsky, MJ, Lipson, KS, Sullivan, MB, Caporaso, JG, and Krajmalnik-Brown, R.
-Microbiome, under review (2016).
+Microbiome (2017). DOI: 10.1186/s40168-016-0225-7. 
 
 Corresponding sample metadata is [here](https://docs.google.com/spreadsheets/d/1SNYZm3Y42R3Q2WdRTkw7Avg089KkEaIyRxI84s8ASHg/edit?usp=sharing).
 
