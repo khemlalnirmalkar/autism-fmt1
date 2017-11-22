@@ -78,13 +78,6 @@ def _distance_to_donor(sid, donor, dm, donor_sids):
     except MissingIDError:
         return np.nan
 
-def add_alpha_diversity(sample_md, collated_alpha_df, column_name):
-    max_depth = collated_alpha_df['sequences per sample'].max()
-    collated_alpha_df = collated_alpha_df[collated_alpha_df['sequences per sample'] == max_depth]
-    collated_alpha_series = collated_alpha_df.drop(['Unnamed: 0', 'sequences per sample', 'iteration'], axis=1).T.mean(axis=1)
-    sample_md[column_name] = collated_alpha_series
-    return sample_md
-
 def add_distance_to_donor(sample_md, dm, metric_name, verbose=False):
     distance_to_initial_donor_data = []
     distance_to_most_relevant_donor_data = []
@@ -195,7 +188,7 @@ def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=
         grid.map(plt.axhline, y=median_inter_nt,
             color=palette['neurotypical'], linestyle='-.', label='between neurotypical distance (median)')
 
-    grid.set(xticks=[0, 3, 10, 18], xlim=(-0.5, 18.5))
+    grid.set(xticks=[0, 3, 10, 18, 100], xlim=(-0.5, 18.5))
     grid.set_axis_labels("", "")
     grid.fig.tight_layout(w_pad=1)
     if save:

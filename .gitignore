@@ -68,3 +68,6 @@ engraftment-plots
 taxonomy-change.csv
 taxonomy-engraftment.csv
 alpha-diversity-even5721.csv
+
+#macOS stuff
+.DS_Store
