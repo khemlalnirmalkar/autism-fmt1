@@ -50,6 +50,11 @@ def control_metric(sample_md, sample_type, metric):
                                   [('Group', 'neurotypical'), ('time_point', "1"), ('SampleType', sample_type)]).index
     return group_metric(sample_md, group_sids, metric)
 
+def asd_metric(sample_md, sample_type, metric):
+    group_sids = filter_sample_md(sample_md,
+                                  [('Group', 'autism'), ('time_point', "1"), ('SampleType', sample_type)]).index
+    return group_metric(sample_md, group_sids, metric)
+
 def inter_neurotypical_distances(sample_md, dm, sample_type):
     group_sids = filter_sample_md(sample_md,
                                   [('Group', 'neurotypical'), ('time_point', "1"), ('SampleType', sample_type)]).index
@@ -161,7 +166,8 @@ def plot_week_data(df, sample_type, metric, hue=None, hide_donor_baseline=False,
         ax.set_ylabel('')
     return fig
 
-def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False, dm=None, save=True):
+def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=False, hide_control_baseline=False, dm=None, save=True,
+                         xticks=[0, 18, 100], xlim=(-0.5, 100.5)):
     df['week'] = pd.to_numeric(df['week'], errors='coerce')
     df[metric] = pd.to_numeric(df[metric], errors='coerce')
     df = df.sort_values(by='week')
@@ -188,7 +194,7 @@ def plot_week_data_facet(df, sample_type, metric, hue=None, hide_donor_baseline=
         grid.map(plt.axhline, y=median_inter_nt,
             color=palette['neurotypical'], linestyle='-.', label='between neurotypical distance (median)')
 
-    grid.set(xticks=[0, 3, 10, 18, 100], xlim=(-0.5, 18.5))
+    grid.set(xticks=xticks, xlim=xlim)
     grid.set_axis_labels("", "")
     grid.fig.tight_layout(w_pad=1)
     if save:
